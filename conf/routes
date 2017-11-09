@@ -4,7 +4,19 @@
 # ~~~~
 
 # An example controller showing a sample home page
-GET     /                           controllers.HomeController.index
+GET     /                                   controllers.HomeController.index
 
-# Map static resources from the /public folder to the /assets URL path
-GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
+POST    /orders                             controllers.OrderController.createOrder
+
+GET     /orders/:orderId                     controllers.OrderController.getOrder(orderId)
+
+POST    /orders/set-paid                     controllers.OrderController.setPaid
+
+POST    /orders/deliver                        controllers.OrderController.deliver
+
+POST    /orders/set-received                    controllers.OrderController.receive
+
+POST    /orders/confirm                         controllers.OrderController.confirm
+
+POST    /orders/:orderId/cancel                controllers.OrderController.cancel(orderId)
+

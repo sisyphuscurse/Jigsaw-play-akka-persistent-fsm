@@ -1,6 +1,7 @@
 package controllers
 
 import javax.inject._
+
 import play.api._
 import play.api.mvc._
 
@@ -10,7 +11,7 @@ import play.api.mvc._
  */
 @Singleton
 class HomeController @Inject()(cc: ControllerComponents) extends AbstractController(cc) {
-
+  val logger = Logger(this.getClass);
   /**
    * Create an Action to render an HTML page.
    *
@@ -22,3 +23,4 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     Ok(views.html.index())
   }
 }
+

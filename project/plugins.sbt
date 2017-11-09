@@ -1,1 +1,3 @@
-addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "maven(com.typesafe.play, play_2.12, stable)")
+addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.6.2")
+
+addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.2.0")

@@ -1,0 +1,11 @@
+version: "2"
+services:
+
+  stalker.journal:
+    image: 10.232.128.157:5000/yiguan/mongo:3.2.12
+    volumes:
+     - ./.tmp/var/lib/order/journal:/data
+    tmpfs:
+     - /tmp
+    ports:
+     - "27017:27017"
