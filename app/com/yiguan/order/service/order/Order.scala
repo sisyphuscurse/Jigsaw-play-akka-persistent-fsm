@@ -1,10 +1,9 @@
 package com.yiguan.order.service.order
 
-import akka.actor.{ActorRef, Props, Terminated}
+import akka.actor.{ActorRef, Props}
 import akka.persistence.fsm.PersistentFSM
 import com.yiguan.order.service.core.response.ApiResponse
 import com.yiguan.order.service.order.OrderCommand._
-import com.yiguan.order.service.receiption.OrderReceptionistCommand
 import play.api.Logger
 
 import scala.reflect.ClassTag
@@ -17,83 +16,55 @@ class Order(pid: String, requestOrder: RequestOrder, questioner: Option[ActorRef
 
   override def persistenceId: String = pid
 
-  startWith(Created, OrderCreatedData(requestOrder), Some(Order.PAY_TIMEOUT seconds))
+  val orderCreatedData = OrderCreatedData(requestOrder)
+  questioner.foreach(f => f ! ApiResponse.apply(orderCreatedData.orderDetail))
+
+  startWith(Created, orderCreatedData, Some(Order.PAY_TIMEOUT seconds))
 
   when(Created) {
-    case Event(NotifyOrderPaid(_, paymentId, paymentTime, callbackActor), _) =>
+    case Event(NotifyOrderPaid(paymentId, paymentTime, callbackActor), _) =>
       goto(Paid) applying OrderPaid(paymentId, paymentTime) andThen(f => callbackActor ! ApiResponse.apply(f.orderDetail))
 
-    case Event(NotifyOrderCancelled(_, callbackActor), _) =>
-      goto(Cancelled) applying OrderCancelled andThen (
-        data => {
-          reportOrderCancelled(data)
-          answerQuestioner(data, callbackActor)
-        })
-    case Event(GetOrder, data) =>
-      stay applying GetOrderReplied andThen(data => sender() ! data.orderDetail)
+    case Event(NotifyOrderCancelled(callbackActor), _) =>
+      goto(Cancelled) applying OrderCancelled andThen (data => answerOrderDetail(data, callbackActor))
+
     case Event(StateTimeout, _) =>
-      goto(Cancelled) applying OrderStateTimeout andThen reportOrderCancelled
+      goto(Cancelled) applying OrderStateTimeout
   }
 
   when(Paid) {
-    case Event(NotifyOrderInDelivery(orderId, deliverId, deliverTime, callbackActor), _) =>
-      goto(InDelivery) applying OrderInDelivery(deliverId, deliverTime) andThen(
-        data => {
-          reportOrderInDelivery(data)
-          answerQuestioner(data, callbackActor)
-        })
+    case Event(NotifyOrderInDelivery(deliverId, deliverTime, callbackActor), _) =>
+      goto(InDelivery) applying OrderInDelivery(deliverId, deliverTime) andThen(data => answerOrderDetail(data, callbackActor))
   }
 
   when(InDelivery) {
-    case Event(NotifyOrderReceived(orderId, receivedTime, callbackActor), _) =>
-      goto(Received) applying OrderReceived(receivedTime) andThen(
-        data => {
-          reportOrderReceived(data)
-          answerQuestioner(data, callbackActor)
-        })
+    case Event(NotifyOrderReceived(receivedTime, callbackActor), _) =>
+      goto(Received) applying OrderReceived(receivedTime) andThen(data => answerOrderDetail(data, callbackActor))
   }
 
   when(Received, Order.WAIT_CONFIRM_TIMEOUT seconds) {
-    case Event(NotifyOrderConfirmed(orderId, confirmedTime, callbackActor), _) =>
-      goto(Confirmed) applying OrderConfirmed(confirmedTime) andThen(
-        data => {
-          reportOrderCompleted(data)
-          answerQuestioner(data, callbackActor)
-        })
+    case Event(NotifyOrderConfirmed(confirmedTime, callbackActor), _) =>
+      goto(Confirmed) applying OrderConfirmed(confirmedTime) andThen(data => answerOrderDetail(data, callbackActor))
     case Event(StateTimeout, _) =>
-      goto(Confirmed) applying OrderStateTimeout andThen reportOrderCompleted
+      goto(Confirmed) applying OrderStateTimeout
   }
 
   when(Confirmed) {
-    case Event(_, _) => stay
+    case Event(GetOrder(callbackActor), _) =>
+      stay applying GetOrderReplied andThen(data => answerOrderDetail(data, callbackActor))
   }
 
   when(Cancelled) {
-    case Event(_, _) => stay
+    case Event(GetOrder(callbackActor), _) =>
+      stay applying GetOrderReplied andThen(data => answerOrderDetail(data, callbackActor))
   }
 
-  def answerQuestioner(currentStateData: OrderStateData, questioner: ActorRef): Unit = {
+  def answerOrderDetail(currentStateData: OrderStateData, questioner: ActorRef): Unit = {
     questioner ! ApiResponse.apply(currentStateData.orderDetail)
   }
 
-  def reportOrderCancelled(currentStateData: OrderStateData): Unit = {
-    context.parent ! OrderReceptionistCommand.ReportOrderCancelled(currentStateData.orderDetail.orderId,
-      currentStateData.orderDetail.cancelTime.get, currentStateData.orderDetail.orderState.get)
-  }
-
-  def reportOrderInDelivery(currentStateData: OrderStateData): Unit = {
-    context.parent ! OrderReceptionistCommand.ReportOrderInDelivery(currentStateData.orderDetail.orderId, currentStateData.orderDetail.deliverId.get,
-      currentStateData.orderDetail.deliverTime.get, currentStateData.orderDetail.orderState.get)
-  }
-
-  def reportOrderReceived(currentStateData: OrderStateData): Unit = {
-    context.parent ! OrderReceptionistCommand.ReportOrderReceived(currentStateData.orderDetail.orderId, currentStateData.orderDetail.receivedTime.get,
-      currentStateData.orderDetail.orderState.get)
-  }
-
-  def reportOrderCompleted(currentStateData: OrderStateData): Unit = {
-    context.parent ! OrderReceptionistCommand.ReportOrderConfirmed(currentStateData.orderDetail.orderId,
-      currentStateData.orderDetail.confirmedTime.get, currentStateData.orderDetail.orderState.get)
+  def answerIllegalCommand(currentStateData: OrderStateData, questioner: ActorRef): Unit = {
+    questioner ! ApiResponse(ApiResponse.ILLEGAL_REQUEST, "该状态不支持此操作")
   }
 
   override def applyEvent(domainEvent: OrderDomainEvent, currentData: OrderStateData): OrderStateData = {
@@ -104,14 +75,23 @@ class Order(pid: String, requestOrder: RequestOrder, questioner: Option[ActorRef
       case event: OrderConfirmed => currentData.orderConfirmedFired(event.confirmedTime)
       case OrderCancelled => currentData.orderCancelled()
       case OrderStateTimeout => currentData.stateTimeout()
-      case GetOrderReplied => currentData
+      case _ => currentData
     }
   }
 
   whenUnhandled {
-    case Event(NotifyOrderCancelled(orderId, callbackActor), _) => {
-      stay andThen(f => callbackActor ! ApiResponse(ApiResponse.ILLEGAL_REQUEST, "无法取消订单"))
-    }
+    case Event(GetOrder(callbackActor), _) =>
+      stay applying GetOrderReplied andThen(data => answerOrderDetail(data, callbackActor))
+    case Event(NotifyOrderPaid(_, _, callbackActor), data) =>
+      stay applying InvalidCommandReplied andThen(data => answerIllegalCommand(data, callbackActor))
+    case Event(NotifyOrderCancelled(callbackActor), data) =>
+      stay applying GetOrderReplied andThen(data => answerIllegalCommand(data, callbackActor))
+    case Event(NotifyOrderInDelivery(_, _, callbackActor), data) =>
+      stay applying InvalidCommandReplied andThen(data => answerIllegalCommand(data, callbackActor))
+    case Event(NotifyOrderReceived(_, callbackActor), data) =>
+      stay applying InvalidCommandReplied andThen(data => answerIllegalCommand(data, callbackActor))
+    case Event(NotifyOrderConfirmed(_, callbackActor), data) =>
+      stay applying InvalidCommandReplied andThen(data => answerIllegalCommand(data, callbackActor))
     case Event(event, _) => {
       stay andThen(f => logger.error(s"unhandled event:${event}"))
     }

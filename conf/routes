@@ -18,5 +18,5 @@ POST    /orders/set-received                    controllers.OrderController.rece
 
 POST    /orders/confirm                         controllers.OrderController.confirm
 
-POST    /orders/:orderId/cancel                controllers.OrderController.cancel(orderId)
+GET    /orders/:orderId/cancel                controllers.OrderController.cancel(orderId)
 

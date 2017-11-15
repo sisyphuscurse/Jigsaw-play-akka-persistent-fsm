@@ -1,8 +1,6 @@
 package com.yiguan.order.service.receiption
 
-import akka.actor.ActorRef
 import com.yiguan.order.service.core.request.OrderItem
-import com.yiguan.order.service.order.OrderDetail
 import play.api.libs.json.Json
 
 object OrderReceptionistCommand {
@@ -30,13 +28,4 @@ object OrderReceptionistCommand {
   }
 
   case class GetOrder(orderId: String)
-
-  // Order notify OrderReceptionist
-  case class ReportOrderCreated(orderId: String, totalPrice: BigDecimal, orderTime: String, orderState: String)
-  case class ReportOrderPaid(orderId: String, paymentId: String, paymentTime: String, orderState: String)
-  case class ReportOrderInDelivery(orderId: String, deliverId: String, deliverTime: String, orderState: String)
-  case class ReportOrderReceived(orderId: String, receivedTime: String, orderState: String)
-
-  case class ReportOrderConfirmed(orderId: String, confirmTime: String, orderState: String)
-  case class ReportOrderCancelled(orderId: String, cancelTime: String, orderState: String)
 }
