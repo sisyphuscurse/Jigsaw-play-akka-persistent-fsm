@@ -2,4 +2,5 @@
 *.log
 .idea
 *.cache
+.DS_Store
 target/*
