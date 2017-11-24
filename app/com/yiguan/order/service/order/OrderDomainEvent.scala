@@ -10,6 +10,6 @@ case class OrderConfirmed(confirmedTime: String) extends OrderDomainEvent
 case object OrderCancelled extends OrderDomainEvent
 case object OrderStateTimeout extends OrderDomainEvent
 
-case object GetOrderReplied extends OrderDomainEvent
-case object InvalidCommandReplied extends OrderDomainEvent
+//case object GetOrderReplied extends OrderDomainEvent
+//case object InvalidCommandReplied extends OrderDomainEvent
 

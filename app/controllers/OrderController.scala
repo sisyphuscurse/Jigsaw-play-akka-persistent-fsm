@@ -1,6 +1,6 @@
 package controllers
 
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 
 import akka.actor.ActorSystem
 import akka.pattern.ask
@@ -17,6 +17,7 @@ import play.api.mvc.{AbstractController, ControllerComponents, Request, Result}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
+@Singleton
 class OrderController @Inject()(system: ActorSystem, cc: ControllerComponents) extends AbstractController(cc) {
   val logger = Logger(this.getClass);
 
@@ -28,7 +29,8 @@ class OrderController @Inject()(system: ActorSystem, cc: ControllerComponents) e
 
   def createOrder() = Action.async(parse.json) { request: Request[JsValue] =>
     request.body.validate[CreateOrderRequest].map { req =>
-      (receptionist ? OrderReceptionistCommand.RequestOrder(req.uid, req.items)).mapTo[ApiResponse[OrderDetail]]
+      (receptionist ? OrderReceptionistCommand.RequestOrder(req.uid, req.items))
+        .mapTo[ApiResponse[OrderDetail]]
         .map(toResponse)
         .recover(requestFailed)
     }.getOrElse(Future.successful(BadRequest))

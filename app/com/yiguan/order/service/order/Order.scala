@@ -23,7 +23,7 @@ class Order(pid: String, requestOrder: RequestOrder, questioner: Option[ActorRef
 
   when(Created) {
     case Event(NotifyOrderPaid(paymentId, paymentTime, callbackActor), _) =>
-      goto(Paid) applying OrderPaid(paymentId, paymentTime) andThen(f => callbackActor ! ApiResponse.apply(f.orderDetail))
+      goto(Paid) applying OrderPaid(paymentId, paymentTime) andThen(data => callbackActor ! ApiResponse.apply(data.orderDetail))
 
     case Event(NotifyOrderCancelled(callbackActor), _) =>
       goto(Cancelled) applying OrderCancelled andThen (data => answerOrderDetail(data, callbackActor))
@@ -50,13 +50,15 @@ class Order(pid: String, requestOrder: RequestOrder, questioner: Option[ActorRef
   }
 
   when(Confirmed) {
-    case Event(GetOrder(callbackActor), _) =>
-      stay applying GetOrderReplied andThen(data => answerOrderDetail(data, callbackActor))
+    case Event(GetOrder(callbackActor), data) =>
+      answerOrderDetail(data, callbackActor)
+      stay
   }
 
   when(Cancelled) {
-    case Event(GetOrder(callbackActor), _) =>
-      stay applying GetOrderReplied andThen(data => answerOrderDetail(data, callbackActor))
+    case Event(GetOrder(callbackActor), data) =>
+      answerOrderDetail(data, callbackActor)
+      stay
   }
 
   def answerOrderDetail(currentStateData: OrderStateData, questioner: ActorRef): Unit = {
@@ -80,26 +82,34 @@ class Order(pid: String, requestOrder: RequestOrder, questioner: Option[ActorRef
   }
 
   whenUnhandled {
-    case Event(GetOrder(callbackActor), _) =>
-      stay applying GetOrderReplied andThen(data => answerOrderDetail(data, callbackActor))
+    case Event(GetOrder(callbackActor), data) =>
+      answerOrderDetail(data, callbackActor)
+      stay
     case Event(NotifyOrderPaid(_, _, callbackActor), data) =>
-      stay applying InvalidCommandReplied andThen(data => answerIllegalCommand(data, callbackActor))
+      answerIllegalCommand(data, callbackActor)
+      stay
     case Event(NotifyOrderCancelled(callbackActor), data) =>
-      stay applying GetOrderReplied andThen(data => answerIllegalCommand(data, callbackActor))
+      answerIllegalCommand(data, callbackActor)
+      stay
     case Event(NotifyOrderInDelivery(_, _, callbackActor), data) =>
-      stay applying InvalidCommandReplied andThen(data => answerIllegalCommand(data, callbackActor))
+      answerIllegalCommand(data, callbackActor)
+      stay
     case Event(NotifyOrderReceived(_, callbackActor), data) =>
-      stay applying InvalidCommandReplied andThen(data => answerIllegalCommand(data, callbackActor))
+      answerIllegalCommand(data, callbackActor)
+      stay
     case Event(NotifyOrderConfirmed(_, callbackActor), data) =>
-      stay applying InvalidCommandReplied andThen(data => answerIllegalCommand(data, callbackActor))
+      answerIllegalCommand(data, callbackActor)
+      stay
     case Event(event, _) => {
-      stay andThen(f => logger.error(s"unhandled event:${event}"))
+      logger.error(s"unhandled event:${event}")
+      stay
     }
   }
 
   override def onRecoveryCompleted(): Unit = stateName match {
     case Created => setStateTimeout(Created, Some(Order.PAY_TIMEOUT seconds))
     case Received => setStateTimeout(Received, Some(Order.WAIT_CONFIRM_TIMEOUT seconds))
+    case _ => logger.debug(s"onRecoveryCompleted do nothing")
   }
 }
 

@@ -19,7 +19,7 @@ sealed trait OrderStateData {
   def orderCancelled(): OrderStateData
 
   // helpers
-  def notSupported = this
+  def ignored = this
 
   def now = {
     val cal = Calendar.getInstance();
@@ -37,17 +37,17 @@ object OrderDetail {
 }
 
 abstract class AbstractOrderStateData() extends OrderStateData {
-  override def orderPaidFired(paymentId: String, paymentTime: String): OrderStateData = notSupported
+  override def orderPaidFired(paymentId: String, paymentTime: String): OrderStateData = ignored
 
-  override def orderInDeliveryFired(deliverId: String, deliverTime: String): OrderStateData = notSupported
+  override def orderInDeliveryFired(deliverId: String, deliverTime: String): OrderStateData = ignored
 
-  override def orderReceivedFired(receivedTime: String): OrderStateData = notSupported
+  override def orderReceivedFired(receivedTime: String): OrderStateData = ignored
 
-  override def orderConfirmedFired(confirmedTime: String): OrderStateData = notSupported
+  override def orderConfirmedFired(confirmedTime: String): OrderStateData = ignored
 
-  override def stateTimeout(): OrderStateData = notSupported
+  override def stateTimeout(): OrderStateData = ignored
 
-  override def orderCancelled(): OrderStateData = notSupported
+  override def orderCancelled(): OrderStateData = ignored
 }
 
 case class OrderCreatedData(requestOrder: OrderCommand.RequestOrder) extends AbstractOrderStateData {

@@ -5,6 +5,7 @@
 
 # An example controller showing a sample home page
 GET     /                                   controllers.HomeController.index
+GET     /index1                                   controllers.HomeController.index1
 
 POST    /orders                             controllers.OrderController.createOrder
 
