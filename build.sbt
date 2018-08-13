@@ -1,5 +1,5 @@
 name := """JigsawOnPlay"""
-organization := "com.yiguanjinrong"
+organization := "com.yiguan"
 
 version := "1.0-SNAPSHOT"
 
